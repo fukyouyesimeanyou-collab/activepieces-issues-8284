@@ -1,45 +1,49 @@
-# name: Unified Automate Deploy
-#
-# on:
-#   workflow_dispatch:
-#   push:
-#     branches:
-#       - main
-#   pull_request:
-#     types: [merged]
-#     branches:
-#       - main
-#     merged: true
-#
-# jobs:
-#   Deploy:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Configure SSH
-#         run: |
-#           mkdir -p ~/.ssh/
-#           echo "$SSH_KEY" > ~/.ssh/preview-server.key
-#           chmod 600 ~/.ssh/preview-server.key
-#           cat >>~/.ssh/config <<END
-#           Host preview-server
-#             HostName $SSH_HOST
-#             User $SSH_USER
-#             IdentityFile ~/.ssh/preview-server.key
-#             StrictHostKeyChecking no
-#           END
-#         env:
-#           SSH_USER: ${{ secrets.PRE_PROD_USERNAME }}
-#           SSH_KEY: ${{ secrets.PREVIEW_SSH_KEY }}
-#           SSH_HOST: ${{ secrets.PREVIEW_HOST }}
-#
-#       - name: Run Pre-Prod Setup
-#         run: |
-#           ssh preview-server -t -t 'bash -ic "cd /root/environments && npm run build && node dist/index.js setup main preprod env.preprod; exit"'
-#
-#       - name: Run Community Setup
-#         run: |
-#           ssh preview-server -t -t 'bash -ic "cd /root/environments && npm run build && node dist/index.js setup main ce env.ce; exit"'
-#
-#       - name: Run Enterprise Setup
-#         run: |
-#           ssh preview-server -t -t 'bash -ic "cd /root/environments && npm run build && node dist/index.js setup main ee env.ee; exit"'
+name: Unified Automate Deploy
+
+on:
+  workflow_dispatch: # 允許手動執行
+  push:
+    branches:
+      - main     # 當程式碼推送到 main 分支時觸發
+  pull_request:
+    types: [closed] # 監聽 PR 關閉事件
+    branches:
+      - main     # 目標分支為 main
+
+jobs:
+  Deploy:
+    # 關鍵修正：只有在手動執行、直接 Push、或 PR 是「已合併」狀態關閉時才執行
+    if: |
+      github.event_name == 'push' || 
+      github.event_name == 'workflow_dispatch' || 
+      (github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/.ssh/preview-server.key
+          chmod 600 ~/.ssh/preview-server.key
+          cat >>~/.ssh/config <<END
+          Host preview-server
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/preview-server.key
+            StrictHostKeyChecking no
+          END
+        env:
+          SSH_USER: ${{ secrets.PRE_PROD_USERNAME }}
+          SSH_KEY: ${{ secrets.PREVIEW_SSH_KEY }}
+          SSH_HOST: ${{ secrets.PREVIEW_HOST }}
+
+      - name: Run Pre-Prod Setup
+        run: |
+          ssh preview-server -t -t 'bash -ic "cd /root/environments && npm run build && node dist/index.js setup main preprod env.preprod; exit"'
+
+      - name: Run Community Setup
+        run: |
+          ssh preview-server -t -t 'bash -ic "cd /root/environments && npm run build && node dist/index.js setup main ce env.ce; exit"'
+
+      - name: Run Enterprise Setup
+        run: |
+          ssh preview-server -t -t 'bash -ic "cd /root/environments && npm run build && node dist/index.js setup main ee env.ee; exit"'
